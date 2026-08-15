@@ -1,0 +1,12 @@
+# catalog build (local): standard-library + these
+pandas
+pyarrow
+# embedding + probe pipeline
+torch                 # CUDA build on the GPU node
+fair-esm              # ESM-2 (facebookresearch/esm)
+h5py
+scikit-learn
+scipy
+pyyaml
+matplotlib
+umap-learn            # exploratory UMAP figures only

@@ -1,0 +1,18 @@
+Study A positives pool
+========================================
+unique sequences : 23902
+30% clusters     : 3834
+median length    : 285 aa
+
+by primary class (unique seqs / clusters):
+  Cu                   1311 seqs     242 clusters
+  Zn                  15373 seqs    2740 clusters
+  other_transition     7218 seqs    1228 clusters
+
+ion membership (unique seqs containing each ion):
+  Zn    15373
+  Cu     1537
+  Fe     3018
+  Mn     4028
+  Co      903
+  Ni      139

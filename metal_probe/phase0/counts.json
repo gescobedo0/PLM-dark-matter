@@ -1,0 +1,144 @@
+{
+  "generated": "2026-08-15 16:23:12",
+  "source": "RCSB Search API v2",
+  "res_cutoff": 3.0,
+  "cluster_cutoff_pct": 30,
+  "rows": [
+    {
+      "ion": "Zn",
+      "codes": "ZN",
+      "category": "transition",
+      "entries_all_methods": 27741,
+      "entries_xray_res3.0": 19599,
+      "polymer_entities_xray_res3.0": 35671,
+      "clusters_30pct": 4231
+    },
+    {
+      "ion": "Cu",
+      "codes": "CU+CU1",
+      "category": "transition",
+      "entries_all_methods": 2544,
+      "entries_xray_res3.0": 2186,
+      "polymer_entities_xray_res3.0": 3424,
+      "clusters_30pct": 406
+    },
+    {
+      "ion": "Fe (ionic)",
+      "codes": "FE+FE2",
+      "category": "transition",
+      "entries_all_methods": 3943,
+      "entries_xray_res3.0": 3393,
+      "polymer_entities_xray_res3.0": 5988,
+      "clusters_30pct": 649
+    },
+    {
+      "ion": "Mn",
+      "codes": "MN",
+      "category": "transition",
+      "entries_all_methods": 5176,
+      "entries_xray_res3.0": 4647,
+      "polymer_entities_xray_res3.0": 6791,
+      "clusters_30pct": 1134
+    },
+    {
+      "ion": "Co",
+      "codes": "CO+3CO",
+      "category": "transition",
+      "entries_all_methods": 1210,
+      "entries_xray_res3.0": 1148,
+      "polymer_entities_xray_res3.0": 1319,
+      "clusters_30pct": 433
+    },
+    {
+      "ion": "Ni",
+      "codes": "NI",
+      "category": "transition",
+      "entries_all_methods": 2404,
+      "entries_xray_res3.0": 2267,
+      "polymer_entities_xray_res3.0": 2787,
+      "clusters_30pct": 862
+    },
+    {
+      "ion": "Mo",
+      "codes": "MO+4MO+6MO+2MO+MOO",
+      "category": "transition",
+      "entries_all_methods": 149,
+      "entries_xray_res3.0": 131,
+      "polymer_entities_xray_res3.0": 216,
+      "clusters_30pct": 58
+    },
+    {
+      "ion": "Ca",
+      "codes": "CA",
+      "category": "alkaline_earth",
+      "entries_all_methods": 16479,
+      "entries_xray_res3.0": 13813,
+      "polymer_entities_xray_res3.0": 20521,
+      "clusters_30pct": 3649
+    },
+    {
+      "ion": "Mg",
+      "codes": "MG",
+      "category": "alkaline_earth",
+      "entries_all_methods": 28577,
+      "entries_xray_res3.0": 19686,
+      "polymer_entities_xray_res3.0": 45488,
+      "clusters_30pct": 5436
+    },
+    {
+      "ion": "Na",
+      "codes": "NA",
+      "category": "alkali",
+      "entries_all_methods": 13704,
+      "entries_xray_res3.0": 12553,
+      "polymer_entities_xray_res3.0": 20320,
+      "clusters_30pct": 4264
+    },
+    {
+      "ion": "K",
+      "codes": "K",
+      "category": "alkali",
+      "entries_all_methods": 5214,
+      "entries_xray_res3.0": 3861,
+      "polymer_entities_xray_res3.0": 11605,
+      "clusters_30pct": 1380
+    },
+    {
+      "ion": "Fe (heme)",
+      "codes": "HEM+HEC+HEA+HEB",
+      "category": "cofactor",
+      "entries_all_methods": 7597,
+      "entries_xray_res3.0": 6557,
+      "polymer_entities_xray_res3.0": 10591,
+      "clusters_30pct": 528
+    },
+    {
+      "ion": "Fe-S cluster",
+      "codes": "FES+SF4+F3S",
+      "category": "cofactor",
+      "entries_all_methods": 3455,
+      "entries_xray_res3.0": 1991,
+      "polymer_entities_xray_res3.0": 9805,
+      "clusters_30pct": 556
+    },
+    {
+      "ion": "Cd (adventitious)",
+      "codes": "CD",
+      "category": "heavy_atom",
+      "entries_all_methods": 1301,
+      "entries_xray_res3.0": 1171,
+      "polymer_entities_xray_res3.0": 3152,
+      "clusters_30pct": 530
+    },
+    {
+      "ion": "Hg (adventitious)",
+      "codes": "HG",
+      "category": "heavy_atom",
+      "entries_all_methods": 644,
+      "entries_xray_res3.0": 526,
+      "polymer_entities_xray_res3.0": 582,
+      "clusters_30pct": 270
+    }
+  ],
+  "notes": "clusters are over ALL polymer entities in metal-containing structures -> upper bound on binder clusters (site annotation deferred)"
+}

@@ -1,0 +1,11 @@
+# Derived caches — do not commit (activations, UniProt downloads, parquet, figures)
+data/
+*.npz
+*.npy
+*.h5
+*.zarr/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

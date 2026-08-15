@@ -1,0 +1,35 @@
+# metal_probe embedding + probe configuration
+catalog: catalog/catalog.parquet
+fasta: catalog/catalog.fasta
+embed_dir: embeddings
+
+# ESM-2 models for the size sweep (dev on 35M/150M, report on 650M).
+# layers = candidate representation layers to sweep (mid-depth often wins on
+# functional probing; last layer not guaranteed best). Ordered shallow->deep.
+models:
+  "35M":
+    name: esm2_t12_35M_UR50D
+    nlayers: 12
+    dim: 480
+    layers: [6, 9, 12]
+  "150M":
+    name: esm2_t30_150M_UR50D
+    nlayers: 30
+    dim: 640
+    layers: [15, 21, 30]
+  "650M":
+    name: esm2_t33_650M_UR50D
+    nlayers: 33
+    dim: 1280
+    layers: [18, 24, 33]
+
+poolings: [mean, max]      # both stored; mean~global, max~local sites
+max_len: 1022              # ESM-2 positional limit; longer seqs truncated (flagged)
+batch_tokens: 16384        # dynamic batching budget (residues per batch)
+seed: 0
+
+probe:
+  n_splits: 5              # GroupKFold on split_group (cluster30)
+  C: 1.0
+  max_iter: 2000
+  standardize: true

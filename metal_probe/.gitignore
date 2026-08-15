@@ -1,0 +1,10 @@
+# large external downloads + derived data (regenerable)
+data_cache/
+phase0/biolip_lig_frequency_*.txt
+embeddings/
+results/
+logs/
+*.h5
+*.hdf5
+*.npy
+__pycache__/

@@ -1,0 +1,16 @@
+ion,codes,category,entries_all_methods,entries_xray_res3.0,polymer_entities_xray_res3.0,clusters_30pct
+Zn,ZN,transition,27741,19599,35671,4231
+Cu,CU+CU1,transition,2544,2186,3424,406
+Fe (ionic),FE+FE2,transition,3943,3393,5988,649
+Mn,MN,transition,5176,4647,6791,1134
+Co,CO+3CO,transition,1210,1148,1319,433
+Ni,NI,transition,2404,2267,2787,862
+Mo,MO+4MO+6MO+2MO+MOO,transition,149,131,216,58
+Ca,CA,alkaline_earth,16479,13813,20521,3649
+Mg,MG,alkaline_earth,28577,19686,45488,5436
+Na,NA,alkali,13704,12553,20320,4264
+K,K,alkali,5214,3861,11605,1380
+Fe (heme),HEM+HEC+HEA+HEB,cofactor,7597,6557,10591,528
+Fe-S cluster,FES+SF4+F3S,cofactor,3455,1991,9805,556
+Cd (adventitious),CD,heavy_atom,1301,1171,3152,530
+Hg (adventitious),HG,heavy_atom,644,526,582,270

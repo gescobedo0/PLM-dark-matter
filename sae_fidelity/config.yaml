@@ -1,0 +1,62 @@
+# SAE fidelity diagnostic — configuration
+# All paths are relative to the repo root unless absolute.
+
+seed: 0
+
+paths:
+  catalog: neworfcatalog.csv
+  data_dir: data                      # gitignored; parquet + activation cache land here
+  subsample: data/subsample.parquet
+  activations_dir: data/activations   # one shard per chunk (resumable)
+  sae_features: data/sae_features      # per-residue sparse features + FVU
+  report_dir: data/report
+
+# --- HuggingFace artifacts (verified) ---
+hf:
+  base_model: biohub/ESMC-6B
+  sae_repo: biohub/ESMC-6B-sae-layer60-k64-codebook16384
+  feature_table_repo: biohub/ESMC-SAE-Features
+  feature_table_file: uniref90_feature_table.parquet
+
+sae:
+  hidden_dim: 2560
+  codebook: 16384
+  topk: 64
+  # hidden_states index for "layer 60". hidden_states[0] is the embedding layer,
+  # so the residual stream after transformer block 60 is index 60. VALIDATE this
+  # against Group-C reconstruction before trusting any number (see verification).
+  layer_index: 60
+
+# --- subsample sizes (diagnostic; not the full catalog) ---
+subsample:
+  min_len: 10            # drop ORFs shorter than this (catalog min length is 1)
+  n_microprotein: 5000   # Group A
+  n_length_matched: 5000 # Group B (canonical, length-matched to A)
+  n_background: 5000     # Group C (canonical, natural full lengths)
+  length_bins: [10, 20, 30, 50, 70, 100, 10000]  # for stratification & matching
+
+# orf_type -> coarse subclass proxy (conserved-vs-ORFan is not in the catalog)
+subclass_map:
+  uORF:  regulatory
+  uoORF: regulatory
+  dORF:  regulatory
+  doORF: regulatory
+  lncRNA: lncRNA_orf
+  intORF: internal
+  PT:     processed_transcript
+
+# crude TM tag (proxy for DeepTMHMM). A residue window is "TM-like" if its mean
+# Kyte-Doolittle hydropathy over `tm_window` residues exceeds `tm_threshold`.
+tm_proxy:
+  window: 18
+  threshold: 1.6
+
+extraction:
+  dtype: bfloat16
+  max_batch_tokens: 8000   # length-bucketed batching; tune to VRAM
+  drop_special_tokens: true
+
+# decision thresholds for the FVU verdict (median FVU ratios, group A vs C)
+decision:
+  fvu_comparable_ratio: 1.25   # A median FVU <= 1.25x C median -> "comparable"
+  fvu_elevated_ratio: 2.0      # A median FVU >= 2.0x C median -> "elevated"

@@ -1,0 +1,16 @@
+# Core (runnable anywhere, incl. local dev for the non-GPU steps)
+numpy>=1.26
+pandas>=2.1
+pyarrow>=14          # parquet I/O
+scipy>=1.11
+matplotlib>=3.8
+pyyaml>=6
+requests>=2.31       # UniProt / InterPro fetch for controls + markers
+tqdm>=4.66
+
+# GPU / model steps (Colab). Pinned loosely; install in the Colab runtime.
+# torch is provided by the Colab image; do not pin it here.
+transformers>=4.44
+huggingface_hub>=0.24
+safetensors>=0.4
+# esm>=3.1           # optional: EvolutionaryScale SDK, if we use ESMC.from_pretrained

@@ -1,0 +1,16 @@
+ion,category,codes,rcsb_structures,rcsb_clusters_30pct,biolip_sites,biolip_per_structure
+Zn,transition,ZN,19599,4231,71440,3.65
+Cu,transition,CU+CU1,2186,406,7897,3.61
+Fe (ionic),transition,FE+FE2,3393,649,11935,3.52
+Mn,transition,MN,4647,1134,13562,2.92
+Co,transition,CO+3CO,1148,433,2794,2.43
+Ni,transition,NI,2267,862,417,0.18
+Mo,transition,MO+4MO+6MO+2MO+MOO,131,58,225,1.72
+Ca,alkaline_earth,CA,13813,3649,48002,3.48
+Mg,alkaline_earth,MG,19686,5436,55088,2.8
+Na,alkali,NA,12553,4264,993,0.08
+K,alkali,K,3861,1380,729,0.19
+Fe (heme),cofactor,HEM+HEC+HEA+HEB,6557,528,21316,3.25
+Fe-S cluster,cofactor,FES+SF4+F3S,1991,556,13468,6.76
+Cd (adventitious),heavy_atom,CD,1171,530,227,0.19
+Hg (adventitious),heavy_atom,HG,526,270,51,0.1

@@ -1,0 +1,9 @@
+# Derived caches — do not commit (activations ~1-2 GB, plus parquet/figures)
+data/
+*.npz
+*.npy
+*.h5
+*.zarr/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
