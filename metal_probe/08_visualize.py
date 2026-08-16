@@ -42,10 +42,19 @@ def scatter(ax, xy, labels, title):
     ax.legend(markerscale=2, fontsize=7, loc="best", framealpha=0.7)
 
 
+def overlay_highlights(ax, xy, hl):
+    """Mark user-highlighted ORFs (add_highlights.py) as black outlined stars."""
+    if hl is None or not hl.any():
+        return
+    ax.scatter(xy[hl, 0], xy[hl, 1], s=150, marker="*", facecolor="none",
+               edgecolor="black", linewidths=1.4, label="highlighted", zorder=6)
+    ax.legend(markerscale=1, fontsize=7, loc="best", framealpha=0.7)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
-    ap.add_argument("--layer", type=int, required=True)
+    ap.add_argument("--layer", type=int, default=None, help="default: deepest stored layer")
     ap.add_argument("--pooling", default="mean")
     ap.add_argument("--config", default=str(ROOT / "config.yaml"))
     ap.add_argument("--umap-neighbors", type=int, default=15)
@@ -54,14 +63,26 @@ def main():
     cfg = yaml.safe_load(open(args.config))
 
     cat = pd.read_parquet(ROOT / cfg["catalog"]).set_index("protein_id")
-    ids, arr = store.read(ROOT / cfg["embed_dir"] / f"esm2_{args.model}.h5",
-                          args.layer, args.pooling)
+    h5 = ROOT / cfg["embed_dir"] / f"esm2_{args.model}.h5"
+    if not h5.exists():
+        shards = list((ROOT / cfg["embed_dir"]).glob(f"esm2_{args.model}_shard*of*.h5"))
+        raise SystemExit(
+            f"\n[08_visualize] no embeddings at {h5}.\n"
+            f"  Embeddings are produced by the Slurm job, which runs asynchronously.\n"
+            f"  {'Found ' + str(len(shards)) + ' shard(s) — run: python 06_merge_embeddings.py --model ' + args.model if shards else 'No shards yet — the embed job has not finished (check: sacct -j <id>, cat logs/embed_*.out).'}\n")
+    if args.layer is None:
+        args.layer = max(store.available(h5)[0])
+    ids, arr = store.read(h5, args.layer, args.pooling)
     keep = [i for i in ids if i in cat.index]
     pos = {i: k for k, i in enumerate(ids)}
     X = arr[[pos[i] for i in keep]]
     meta = cat.loc[keep]
     classes = meta["class"].to_numpy()
     lengths = meta["length"].to_numpy()
+    hl = (meta["highlight"].fillna(False).to_numpy()
+          if "highlight" in meta.columns else np.zeros(len(meta), bool))
+    if hl.any():
+        print(f"overlaying {int(hl.sum())} highlighted ORF(s)")
 
     Xs = StandardScaler().fit_transform(X)
     pca = PCA(n_components=2, random_state=cfg["seed"]).fit(Xs)
@@ -75,6 +96,7 @@ def main():
     # PCA: by class
     fig, ax = plt.subplots(figsize=(6, 5))
     scatter(ax, xy, classes, f"PCA by class ({args.model} L{args.layer} {args.pooling})")
+    overlay_highlights(ax, xy, hl)
     ax.set_xlabel(f"PC1 ({ev[0]:.1f}%)"); ax.set_ylabel(f"PC2 ({ev[1]:.1f}%)")
     fig.tight_layout(); fig.savefig(outdir / f"pca_class_{base}.png", dpi=150); plt.close(fig)
 
@@ -85,6 +107,7 @@ def main():
     ax.set_title("PCA coloured by log10(length) — length-confound check")
     ax.set_xticks([]); ax.set_yticks([])
     fig.colorbar(sc, ax=ax, label="log10(length)")
+    overlay_highlights(ax, xy, hl)
     fig.tight_layout(); fig.savefig(outdir / f"pca_length_{base}.png", dpi=150); plt.close(fig)
 
     # PCA: microproteins vs metal clusters (Study B question)
@@ -95,6 +118,7 @@ def main():
                alpha=0.2, c="#cccccc", label="non-metal", linewidths=0)
     mp = classes == "microprotein"
     ax.scatter(xy[mp, 0], xy[mp, 1], s=16, alpha=0.9, c="#d62728", label="microproteins", linewidths=0)
+    overlay_highlights(ax, xy, hl)
     ax.set_title("Microproteins vs metal-binder clusters (PCA)")
     ax.set_xticks([]); ax.set_yticks([]); ax.legend(fontsize=8)
     fig.tight_layout(); fig.savefig(outdir / f"pca_microprotein_{base}.png", dpi=150); plt.close(fig)
@@ -109,6 +133,7 @@ def main():
         scatter(ax, uxy, classes,
                 f"UMAP (n_neighbors={args.umap_neighbors}, min_dist={args.umap_mindist}) "
                 "— exploratory; do NOT read inter-cluster distance")
+        overlay_highlights(ax, uxy, hl)
         fig.tight_layout(); fig.savefig(outdir / f"umap_class_{base}.png", dpi=150); plt.close(fig)
         print("wrote UMAP figure")
     except ImportError:

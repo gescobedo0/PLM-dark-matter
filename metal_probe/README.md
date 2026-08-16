@@ -48,13 +48,34 @@ python 04_assemble_catalog.py        # sample to targets -> catalog.{parquet,fas
 
 ### Embeddings + probe (Slurm/GPU)
 
+**Recommended — one command, correctly ordered** (find your GPU partition with `sinfo`):
+
 ```bash
-# 1) embed on the GPU cluster (array job; load model once, stream a shard)
-MODEL=650M sbatch slurm_embed.sh            # then 150M, 35M for the size sweep
-python 06_merge_embeddings.py --model 650M  # merge shards -> embeddings/esm2_650M.h5
-# 2) probe + composition baseline over layers x pooling x models
+PARTITION=gpu ENV_SETUP="source ~/miniconda3/bin/activate metalprobe" ./run_pipeline.sh
+```
+
+This submits the embedding array job **and** a dependent merge+probe+plot job that
+runs only after the embeddings finish. Watch with `squeue -u $USER`; results land
+in `embeddings/esm2_650M.h5`, `results/probe_results.md`, `results/figures/`.
+Repeat with `MODEL=150M` / `MODEL=35M` for the size sweep.
+
+> **`sbatch` is asynchronous.** It queues the job and returns immediately — the
+> GPU work happens later on a compute node. If you run the steps manually, you
+> **must wait** for the embed job to finish before `06`/`07`/`08`. `run_pipeline.sh`
+> enforces this with a Slurm dependency.
+>
+> **The model download is automatic.** ESM-2 weights (~2.5 GB for 650M) are pulled
+> by fair-esm the first time `05` loads the model, into
+> `~/.cache/torch/hub/checkpoints/` on the GPU node — there is no separate
+> download command. The embed job's outputs are `embeddings/esm2_*_shard*.h5`.
+
+Manual path (each step waits on the previous):
+
+```bash
+MODEL=650M sbatch slurm_embed.sh            # EDIT partition + env in the script first
+# wait until done:  squeue -u $USER
+python 06_merge_embeddings.py --model 650M  # shards -> embeddings/esm2_650M.h5
 python 07_probe.py                          # -> results/probe_results.{csv,md}
-# 3) figures (PCA always; UMAP if umap-learn present)
 python 08_visualize.py --model 650M --layer 24 --pooling mean
 ```
 

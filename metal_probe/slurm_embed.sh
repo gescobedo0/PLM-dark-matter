@@ -1,6 +1,13 @@
 #!/bin/bash
+# ---------------------------------------------------------------------------
+# TWO REQUIRED EDITS before this will run (or just use ../run_pipeline.sh):
+#   1. --partition below: set to YOUR cluster's GPU partition (see: sinfo)
+#   2. the environment-activation line near the bottom (torch + fair-esm)
+# `sbatch` only QUEUES the job and returns immediately; wait for it to finish
+# (squeue -u $USER) before running 06/07/08.
+# ---------------------------------------------------------------------------
 #SBATCH --job-name=metalprobe_embed
-#SBATCH --partition=gpu                 # <-- set to your GPU partition
+#SBATCH --partition=gpu                 # <-- REQUIRED: your GPU partition
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G

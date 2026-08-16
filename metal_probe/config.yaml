@@ -21,7 +21,7 @@ models:
     name: esm2_t33_650M_UR50D
     nlayers: 33
     dim: 1280
-    layers: [18, 24, 33]
+    layers: [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33]   # dense trajectory
 
 poolings: [mean, max]      # both stored; mean~global, max~local sites
 max_len: 1022              # ESM-2 positional limit; longer seqs truncated (flagged)
