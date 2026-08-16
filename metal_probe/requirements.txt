@@ -10,3 +10,6 @@ scipy
 pyyaml
 matplotlib
 umap-learn            # exploratory UMAP figures only
+# interactive exploration (10_interactive_pca.py + notebooks/explore_embeddings.ipynb)
+plotly
+notebook             # jupyter, for the explore notebook (optional)
