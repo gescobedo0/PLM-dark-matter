@@ -70,6 +70,47 @@ def cluster_cv(X, y, groups, *, n_splits=5, C=1.0, max_iter=2000,
     }
 
 
+def mlp_cluster_cv(X, y, groups, *, n_splits=5, hidden=128, dropout=0.2,
+                   epochs=30, lr=1e-3, seed=0):
+    """Small MLP (LayerNorm->Linear->LeakyReLU->dropout->Linear), M-Ionic-flavoured,
+    with the same GroupKFold + AUROC/MCC contract as cluster_cv. CPU-friendly."""
+    import torch
+    import torch.nn as nn
+    torch.manual_seed(seed)
+    X = np.asarray(X, np.float32)
+    y = np.asarray(y).astype(np.float32)
+    groups = np.asarray(groups)
+    k = min(n_splits, len(np.unique(groups)))
+    gkf = GroupKFold(n_splits=k)
+    aurocs, mccs = [], []
+    for tr, te in gkf.split(X, y, groups):
+        sc = StandardScaler().fit(X[tr])
+        Xtr = torch.tensor(sc.transform(X[tr])); Xte = torch.tensor(sc.transform(X[te]))
+        ytr = torch.tensor(y[tr])
+        pos_w = torch.tensor([(y[tr] == 0).sum() / max(1, (y[tr] == 1).sum())])
+        net = nn.Sequential(nn.LayerNorm(X.shape[1]), nn.Linear(X.shape[1], hidden),
+                            nn.LeakyReLU(), nn.Dropout(dropout),
+                            nn.LayerNorm(hidden), nn.Linear(hidden, 1))
+        opt = torch.optim.Adam(net.parameters(), lr=lr)
+        lossf = nn.BCEWithLogitsLoss(pos_weight=pos_w)
+        net.train()
+        for _ in range(epochs):
+            opt.zero_grad()
+            loss = lossf(net(Xtr).squeeze(1), ytr)
+            loss.backward(); opt.step()
+        net.eval()
+        with torch.no_grad():
+            proba = torch.sigmoid(net(Xte).squeeze(1)).numpy()
+        pred = (proba >= 0.5).astype(int)
+        if len(np.unique(y[te])) == 2:
+            aurocs.append(roc_auc_score(y[te], proba))
+        mccs.append(matthews_corrcoef(y[te].astype(int), pred))
+    return {"auroc_mean": float(np.mean(aurocs)) if aurocs else float("nan"),
+            "auroc_std": float(np.std(aurocs)) if aurocs else float("nan"),
+            "mcc_mean": float(np.mean(mccs)), "mcc_std": float(np.std(mccs)),
+            "n_folds": k, "n_groups": int(len(np.unique(groups)))}
+
+
 def assert_no_group_leakage(groups, X, y, n_splits=5):
     """Verify GroupKFold never puts a group in both train and test."""
     groups = np.asarray(groups)

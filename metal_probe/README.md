@@ -20,7 +20,26 @@ carry metal-binding biophysics beyond memorized coevolution?** Metal coordinatio
 | 2. Embedding + probe + viz pipeline code | ✅ written, mock-validated (CPU) |
 | 3. Full ESM-2 650M embeddings (Slurm/GPU) | ⬜ run on cluster |
 | 4. Probe + composition baseline; PCA/UMAP | ⬜ (code ready) |
-| 5. Size sweep (35M/150M/650M) emergence | ⬜ (code ready) |
+| 5. Size sweep (35M/150M/650M) emergence | ✅ done — 35M 0.805, 650M 0.827 (early L6 peak) |
+| 6. Per-residue phase (spec + code) | ✅ built, mock-validated; run on cluster |
+
+### Per-residue phase (`RESIDUE_PHASE_SPEC.md`)
+
+The pooled probe plateaued at 0.83 (= M-Ionic's protein-level AUROC) because pooling
+averages away the coordinating residues. The per-residue phase probes at the level
+metal coordination lives. `catalog/residue_labels.parquet` (from `01b`, committed) has
+the sequence-aligned coordinating residues.
+
+```bash
+PARTITION=gpu ENV_SETUP="source ~/miniconda3/bin/activate metalprobe" \
+  MODEL=650M ./run_residue_pipeline.sh        # 05b embed residues -> 06b merge -> 11 probe
+# emergence across sizes/depth (after 35M/150M residue embeds too):
+python 11_residue_probe.py --emergence
+```
+
+`results/residue/residue_probe.md` — the make-or-break row is **`aa_matched` embedding
+vs identity-baseline**: does the embedding distinguish a coordinating His/Cys from a
+non-coordinating one (real site signal), or only detect "it's a His" (identity)?
 
 ## Locked decisions (user sign-off 2026-08-15)
 
