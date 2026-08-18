@@ -30,7 +30,7 @@ import pandas as pd
 import yaml
 from scipy.stats import spearmanr
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import roc_auc_score, silhouette_score
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler, normalize
 
@@ -226,10 +226,64 @@ def main():
         axis_corr[lab] = (round(spearmanr(xy_hid[:, 0], v).statistic, 3),
                           round(spearmanr(xy_hid[:, 1], v).statistic, 3))
 
+    # is metal IDENTITY in PC1/PC2? one-vs-rest AUROC of each PC among known binders
+    METAL = ["Zn", "Cu", "other_transition"]
+    ion_of = np.array([dom_ion.get(p, None) for p in pids], dtype=object)
+    kmask = np.array([cls_of[p] in METAL for p in pids]) & np.array([i is not None for i in ion_of])
+    ion_b = ion_of[kmask]
+    pc_id = []
+    for ion in IONS:
+        yb = (ion_b == ion).astype(int)
+        if yb.sum() < 5 or yb.sum() == len(yb):
+            pc_id.append({"ion": ion, "n": int(yb.sum()), "PC1": np.nan, "PC2": np.nan}); continue
+        a1, a2 = roc_auc_score(yb, xy_hid[kmask, 0]), roc_auc_score(yb, xy_hid[kmask, 1])
+        pc_id.append({"ion": ion, "n": int(yb.sum()),
+                      "PC1": round(max(a1, 1 - a1), 3), "PC2": round(max(a2, 1 - a2), 3)})
+    pc_id = pd.DataFrame(pc_id)
+
+    # binders-by-ion figure (does any PC stratify ions?)
+    fig, ax = plt.subplots(figsize=(6.5, 5.5))
+    for ion in IONS:
+        m = kmask & (ion_of == ion)
+        if m.any():
+            ax.scatter(xy_hid[m, 0], xy_hid[m, 1], s=12, alpha=0.6, label=ion, linewidths=0)
+    ax.set_title("hidden atlas: known binders by ion (is identity in a PC?)")
+    ax.set_xlabel("PC1"); ax.set_ylabel("PC2"); ax.set_xticks([]); ax.set_yticks([]); ax.legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(out / "binders_by_ion.png", dpi=150); plt.close(fig)
+
+    # k-NN overlap: for each query protein, fraction of k nearest Study-A neighbours
+    # that are metal binders (matches "do microproteins sit among metal binders?")
+    def knn_overlap(site, k=15):
+        S = normalize(site); ca = np.array([cls_of[p] for p in pids])
+        metal_m = np.isin(ca, METAL); nonm = ca == "non_metal"
+        ref_idx = np.where(metal_m | nonm)[0]; ref_is_metal = metal_m[ref_idx]
+
+        def frac(qi, excl):
+            sims = S[qi] @ S[ref_idx].T; res = []
+            for r, row in enumerate(sims):
+                take = [j for j in np.argsort(-row) if not (excl and ref_idx[j] == qi[r])][:k]
+                res.append(ref_is_metal[np.array(take)].mean())
+            return round(float(np.median(res)), 3)
+        groups = {"microprotein": (np.where(ca == "microprotein")[0], False),
+                  "size_matched_short": (np.where(ca == "size_matched_short")[0], False),
+                  "metal_binder(ref)": (np.where(metal_m)[0], True),
+                  "non_metal(ref)": (np.where(nonm)[0], True)}
+        return {n: frac(idx, e) for n, (idx, e) in groups.items()}
+    knn_raw, knn_hid = knn_overlap(site_raw), knn_overlap(site_hid)
+
     md = ["# Hidden-representation site-atlas (raw vs MLP hidden)", "",
           f"{args.model} L{layer}, top-{args.kmain} mean-pool. Headline: does the microprotein "
           "island collapse (move toward the metal centroid) under the supervised hidden repr?", "",
-          "## Microprotein-island metric (cosine)", "",
+          "## k-NN overlap (PRIMARY): fraction of k nearest Study-A neighbours that are metal binders",
+          "Microprotein value near `metal_binder(ref)` = microproteins sit AMONG metal binders "
+          "(matches the plot); near `non_metal(ref)` = still an island.", "",
+          "| repr | microprotein | size_matched | metal_binder(ref) | non_metal(ref) |",
+          "|---|--:|--:|--:|--:|",
+          f"| raw | {knn_raw['microprotein']} | {knn_raw['size_matched_short']} | "
+          f"{knn_raw['metal_binder(ref)']} | {knn_raw['non_metal(ref)']} |",
+          f"| hidden | {knn_hid['microprotein']} | {knn_hid['size_matched_short']} | "
+          f"{knn_hid['metal_binder(ref)']} | {knn_hid['non_metal(ref)']} |", "",
+          "## Centroid distance (secondary — misleads when the metal cloud is diffuse)", "",
           "| repr | micro→metal dist | micro frac-closer-to-micro | control→metal dist | control frac |",
           "|---|--:|--:|--:|--:|"]
     for _, x in isldf.iterrows():
@@ -246,6 +300,12 @@ def main():
     md += ["| covariate | PC1 | PC2 |", "|---|--:|--:|"]
     for lab, (c1, c2) in axis_corr.items():
         md.append(f"| {lab} | {c1} | {c2} |")
+    md += ["", "## Is metal IDENTITY in PC1 or PC2? (one-vs-rest AUROC among known binders)",
+           "If PC2 separates an ion (AUROC >> 0.5), it carries that identity. Bounded by the "
+           "discriminate-AUROC ceiling, so expect Zn/Cu at best.", "",
+           "| ion | n | PC1 | PC2 |", "|---|--:|--:|--:|"]
+    for _, x in pc_id.iterrows():
+        md.append(f"| {x['ion']} | {x['n']} | {x['PC1']} | {x['PC2']} |")
     (out / "report.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
     print(f"\nwrote {out}/ (report.md, site_atlas_raw_vs_hidden.png)")
