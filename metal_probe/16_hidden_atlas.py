@@ -171,6 +171,16 @@ def main():
     prot_len = np.array([len(seq_of[p]) for p in pids], float)
     prot_dis = np.array([disorder_proxy(seq_of[p]) for p in pids], float)
     prot_mp = np.array([mp_map[p] for p in pids], float)
+    # composition of the top-k selected residues: soft (His/Cys) vs hard (Asp/Glu)
+    tk = pd.DataFrame({"protein_id": meta["protein_id"].to_numpy()[np.where(cand)[0]],
+                       "aa": meta["aa"].to_numpy()[np.where(cand)[0]], "score": sel_score[cand]})
+    comp = tk.groupby("protein_id").apply(
+        lambda g: pd.Series({"soft": float(g.nlargest(args.kmain, "score")["aa"].isin(list("HC")).mean()),
+                             "hard": float(g.nlargest(args.kmain, "score")["aa"].isin(list("DE")).mean())}),
+        include_groups=False)
+    prot_soft = np.array([comp.loc[p, "soft"] for p in pids])
+    prot_hard = np.array([comp.loc[p, "hard"] for p in pids])
+    prot_softness = prot_soft - prot_hard
 
     # island stats + knowns ion silhouette (OOF hidden vs raw)
     dom_ion = labels.groupby("protein_id")["ion"].agg(lambda s: s.value_counts().idxmax())
@@ -222,9 +232,25 @@ def main():
         fig.colorbar(sc, ax=ax)
     fig.tight_layout(); fig.savefig(out / "hidden_atlas_axes.png", dpi=150); plt.close(fig)
 
+    # colour the atlas by coordinating-residue composition (the soft<->hard axis)
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    for ax, vals, title, cmap in [(axes[0], prot_soft, "His/Cys fraction (soft)", "viridis"),
+                                  (axes[1], prot_hard, "Asp/Glu fraction (hard)", "viridis"),
+                                  (axes[2], prot_softness, "softness (H/C − D/E)", "RdBu_r")]:
+        vm = np.nanmax(np.abs(vals)) if cmap == "RdBu_r" else None
+        sc = ax.scatter(xy_hid[:, 0], xy_hid[:, 1], c=vals, s=10, cmap=cmap, linewidths=0,
+                        vmin=-vm if vm else None, vmax=vm if vm else None)
+        if hlmask.any():
+            ax.scatter(xy_hid[hlmask, 0], xy_hid[hlmask, 1], s=150, marker="*", facecolor="none", edgecolor="red", linewidths=1.4)
+        ax.set_title(f"hidden atlas by {title}"); ax.set_xticks([]); ax.set_yticks([])
+        fig.colorbar(sc, ax=ax)
+    fig.suptitle("Does the atlas track coordinating-residue composition (soft His/Cys ↔ hard Asp/Glu)?")
+    fig.tight_layout(); fig.savefig(out / "hidden_atlas_composition.png", dpi=150); plt.close(fig)
+
     # quantify: which covariate does each PC track?
     axis_corr = {}
-    for lab, v in [("metal_propensity", prot_mp), ("length", prot_len), ("disorder", prot_dis)]:
+    for lab, v in [("metal_propensity", prot_mp), ("length", prot_len), ("disorder", prot_dis),
+                   ("soft_HC_frac", prot_soft), ("hard_DE_frac", prot_hard), ("softness", prot_softness)]:
         axis_corr[lab] = (round(spearmanr(xy_hid[:, 0], v).statistic, 3),
                           round(spearmanr(xy_hid[:, 1], v).statistic, 3))
 
