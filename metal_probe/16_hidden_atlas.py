@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
+from scipy.stats import spearmanr
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 from sklearn.model_selection import GroupKFold
@@ -38,6 +39,19 @@ from embed_lib import probe, store
 ROOT = Path(__file__).resolve().parent
 IONS = ["Zn", "Cu", "Fe", "Mn", "Co", "Ni"]
 CANDIDATE = set("HCDE")
+# TOP-IDP-style composition proxy for intrinsic disorder (no external predictor):
+DISORDER_PROMOTING = set("ARGQSEKP")
+ORDER_PROMOTING = set("WCFIYVLN")
+
+
+def disorder_proxy(seq):
+    """Composition heuristic: (disorder-promoting - order-promoting) / length.
+    Higher = more disorder-prone. A rough proxy to label an atlas axis, not a predictor."""
+    if not seq:
+        return 0.0
+    d = sum(c in DISORDER_PROMOTING for c in seq)
+    o = sum(c in ORDER_PROMOTING for c in seq)
+    return (d - o) / len(seq)
 
 
 def build_labels(meta, coord_ions):
@@ -145,6 +159,16 @@ def main():
     _, site_hid = site_vectors(meta, hid, sel_score, cand, args.kmain)
     cls_of = cat["class"].to_dict()
     hl_of = (cat["highlight"].fillna(False).to_dict() if "highlight" in cat.columns else {})
+    seq_of = cat["seq"].to_dict()
+
+    # per-protein axis covariates (to label what the hidden PCA axes are)
+    dfp = pd.DataFrame({"protein_id": meta["protein_id"].to_numpy()[np.where(cand)[0]],
+                        "score": sel_score[cand]})
+    mp_map = dfp.groupby("protein_id")["score"].apply(
+        lambda s: s.nlargest(args.kmain).mean()).to_dict()
+    prot_len = np.array([len(seq_of[p]) for p in pids], float)
+    prot_dis = np.array([disorder_proxy(seq_of[p]) for p in pids], float)
+    prot_mp = np.array([mp_map[p] for p in pids], float)
 
     # island stats + knowns ion silhouette (OOF hidden vs raw)
     dom_ion = labels.groupby("protein_id")["ion"].agg(lambda s: s.value_counts().idxmax())
@@ -165,23 +189,42 @@ def main():
     sil_raw = silhouette_score(StandardScaler().fit_transform(site_raw[kmask]), known["ion"][kmask])
     sil_hid = silhouette_score(StandardScaler().fit_transform(site_hid[kmask]), known["ion"][kmask])
 
+    cls = np.array([cls_of[p] for p in pids])
+    metal = np.isin(cls, ["Zn", "Cu", "other_transition"])
+    hlmask = np.array([hl_of.get(p, False) for p in pids])
+    xy_raw = PCA(2, random_state=0).fit_transform(StandardScaler().fit_transform(site_raw))
+    xy_hid = PCA(2, random_state=0).fit_transform(StandardScaler().fit_transform(site_hid))
+
     # figure: raw vs hidden PCA, microproteins overlaid
     fig, axes = plt.subplots(1, 2, figsize=(13, 6))
-    for ax, (name, site) in zip(axes, [("raw embeddings", site_raw), ("MLP hidden", site_hid)]):
-        xy = PCA(2, random_state=0).fit_transform(StandardScaler().fit_transform(site))
-        cls = np.array([cls_of[p] for p in pids])
-        metal = np.isin(cls, ["Zn", "Cu", "other_transition"])
+    for ax, name, xy in [(axes[0], "raw embeddings", xy_raw), (axes[1], "MLP hidden", xy_hid)]:
         ax.scatter(xy[cls == "non_metal", 0], xy[cls == "non_metal", 1], s=7, c="#dddddd", alpha=0.5, label="non-metal", linewidths=0)
         ax.scatter(xy[metal, 0], xy[metal, 1], s=9, c="#1f77b4", alpha=0.6, label="metal binder", linewidths=0)
-        mp = cls == "microprotein"
-        ax.scatter(xy[mp, 0], xy[mp, 1], s=20, marker="x", c="#d62728", alpha=0.8, label="microprotein", linewidths=0.8)
-        hlmask = np.array([hl_of.get(p, False) for p in pids])
+        ax.scatter(xy[cls == "microprotein", 0], xy[cls == "microprotein", 1], s=20, marker="x", c="#d62728", alpha=0.8, label="microprotein", linewidths=0.8)
         if hlmask.any():
             ax.scatter(xy[hlmask, 0], xy[hlmask, 1], s=150, marker="*", facecolor="none",
                        edgecolor="black", linewidths=1.4, label="MetalNet2", zorder=6)
         ax.set_title(f"site-atlas on {name}"); ax.set_xticks([]); ax.set_yticks([]); ax.legend(fontsize=7)
     fig.suptitle(f"Top-{args.kmain} site-atlas: does the microprotein island collapse under the supervised representation?")
     fig.tight_layout(); fig.savefig(out / "site_atlas_raw_vs_hidden.png", dpi=150); plt.close(fig)
+
+    # what ARE the hidden-atlas axes? colour by metal-propensity, length, disorder
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    for ax, vals, title in [(axes[0], prot_mp, "metal-propensity (top-k score)"),
+                            (axes[1], np.log10(prot_len), "log10(length)"),
+                            (axes[2], prot_dis, "disorder proxy")]:
+        sc = ax.scatter(xy_hid[:, 0], xy_hid[:, 1], c=vals, s=10, cmap="viridis", linewidths=0)
+        if hlmask.any():
+            ax.scatter(xy_hid[hlmask, 0], xy_hid[hlmask, 1], s=150, marker="*", facecolor="none", edgecolor="red", linewidths=1.4)
+        ax.set_title(f"hidden atlas by {title}"); ax.set_xticks([]); ax.set_yticks([])
+        fig.colorbar(sc, ax=ax)
+    fig.tight_layout(); fig.savefig(out / "hidden_atlas_axes.png", dpi=150); plt.close(fig)
+
+    # quantify: which covariate does each PC track?
+    axis_corr = {}
+    for lab, v in [("metal_propensity", prot_mp), ("length", prot_len), ("disorder", prot_dis)]:
+        axis_corr[lab] = (round(spearmanr(xy_hid[:, 0], v).statistic, 3),
+                          round(spearmanr(xy_hid[:, 1], v).statistic, 3))
 
     md = ["# Hidden-representation site-atlas (raw vs MLP hidden)", "",
           f"{args.model} L{layer}, top-{args.kmain} mean-pool. Headline: does the microprotein "
@@ -197,7 +240,12 @@ def main():
            "out-of-sample, so this is a conservative test.", "",
            "## Knowns ion-type silhouette (bounded by discriminate-AUROC)",
            f"- raw site-vectors: {sil_raw:.3f}", f"- hidden (OOF): {sil_hid:.3f}",
-           "(near 0 = no clean ion clusters; hidden can't exceed what discrimination allows.)"]
+           "(near 0 = no clean ion clusters; hidden can't exceed what discrimination allows.)",
+           "", "## What are the hidden-atlas axes? (Spearman |corr| with PC1 / PC2)",
+           "The metal-propensity axis is the robust signal; a length/disorder axis is the confound to regress out.", ""]
+    md += ["| covariate | PC1 | PC2 |", "|---|--:|--:|"]
+    for lab, (c1, c2) in axis_corr.items():
+        md.append(f"| {lab} | {c1} | {c2} |")
     (out / "report.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
     print(f"\nwrote {out}/ (report.md, site_atlas_raw_vs_hidden.png)")
