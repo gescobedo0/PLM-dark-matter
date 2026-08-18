@@ -136,6 +136,46 @@ def fit_mlp(X, y, *, epochs=50, hidden=128, dropout=0.2, lr=1e-3, seed=0):
     return predict
 
 
+def train_ion_mlp(X, Y, M, *, hidden=128, dropout=0.2, epochs=60, lr=1e-3, seed=0):
+    """Masked multi-label ion MLP. Returns predict(Xnew)->(probs (N,I), hidden (N,H)),
+    exposing the penultimate layer as a supervised representation."""
+    import torch
+    import torch.nn as nn
+    torch.manual_seed(seed)
+    Xt, Yt, Mt = (torch.tensor(np.asarray(a, np.float32)) for a in (X, Y, M))
+    pw = torch.tensor([((M[:, i] * (1 - Y[:, i])).sum()) / max(1.0, (M[:, i] * Y[:, i]).sum())
+                       for i in range(Y.shape[1])], dtype=torch.float32)
+
+    class Net(nn.Module):
+        def __init__(s):
+            super().__init__()
+            s.ni = nn.LayerNorm(X.shape[1]); s.fc1 = nn.Linear(X.shape[1], hidden)
+            s.act = nn.LeakyReLU(); s.dp = nn.Dropout(dropout)
+            s.nh = nn.LayerNorm(hidden); s.head = nn.Linear(hidden, Y.shape[1])
+
+        def forward(s, x, return_hidden=False):
+            h = s.nh(s.dp(s.act(s.fc1(s.ni(x)))))
+            lo = s.head(h)
+            return (lo, h) if return_hidden else lo
+
+    net = Net()
+    opt = torch.optim.Adam(net.parameters(), lr=lr)
+    lossf = nn.BCEWithLogitsLoss(reduction="none", pos_weight=pw)
+    net.train()
+    for _ in range(epochs):
+        opt.zero_grad()
+        loss = (lossf(net(Xt), Yt) * Mt).sum() / Mt.sum()
+        loss.backward(); opt.step()
+    net.eval()
+
+    def predict(Xn):
+        import torch
+        with torch.no_grad():
+            lo, h = net(torch.tensor(np.asarray(Xn, np.float32)), return_hidden=True)
+            return torch.sigmoid(lo).numpy(), h.numpy()
+    return predict
+
+
 def assert_no_group_leakage(groups, X, y, n_splits=5):
     """Verify GroupKFold never puts a group in both train and test."""
     groups = np.asarray(groups)
