@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-from scipy.stats import spearmanr
+from scipy.stats import gaussian_kde, spearmanr
 from sklearn.decomposition import PCA
 from sklearn.metrics import roc_auc_score, silhouette_score
 from sklearn.model_selection import GroupKFold
@@ -38,6 +38,8 @@ from embed_lib import probe, store
 
 ROOT = Path(__file__).resolve().parent
 IONS = ["Zn", "Cu", "Fe", "Mn", "Co", "Ni"]
+ION_COLOR = {"Zn": "#1f77b4", "Cu": "#17becf", "Fe": "#8c564b", "Mn": "#2ca02c",
+             "Co": "#9467bd", "Ni": "#e377c2"}
 CANDIDATE = set("HCDE")
 # TOP-IDP-style composition proxy for intrinsic disorder (no external predictor):
 DISORDER_PROMOTING = set("ARGQSEKP")
@@ -250,6 +252,26 @@ def main():
     ax.set_title("hidden atlas: known binders by ion (is identity in a PC?)")
     ax.set_xlabel("PC1"); ax.set_ylabel("PC2"); ax.set_xticks([]); ax.set_yticks([]); ax.legend(fontsize=8)
     fig.tight_layout(); fig.savefig(out / "binders_by_ion.png", dpi=150); plt.close(fig)
+
+    # 1D density of each PC by ion (among binders): separated curves along PC2 = identity
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
+    for ax, pc, name in [(axes[0], 0, "PC1 (metal-propensity)"), (axes[1], 1, "PC2 (identity?)")]:
+        lo, hi = xy_hid[kmask, pc].min(), xy_hid[kmask, pc].max()
+        xs = np.linspace(lo, hi, 200)
+        for ion in IONS:
+            v = xy_hid[kmask & (ion_of == ion), pc]
+            if len(v) < 8 or np.ptp(v) == 0:
+                continue
+            try:
+                d = gaussian_kde(v)(xs)
+                ax.plot(xs, d, color=ION_COLOR[ion], label=f"{ion} (n={len(v)})")
+                ax.fill_between(xs, d, color=ION_COLOR[ion], alpha=0.12)
+            except Exception:
+                ax.hist(v, bins=20, density=True, histtype="step", color=ION_COLOR[ion], label=ion)
+        ax.set_xlabel(name); ax.set_ylabel("density"); ax.legend(fontsize=7)
+    axes[1].set_title("separated curves here = PC2 carries metal identity")
+    fig.suptitle("PC density by ion (known binders)")
+    fig.tight_layout(); fig.savefig(out / "pc_density_by_ion.png", dpi=150); plt.close(fig)
 
     # k-NN overlap: for each query protein, fraction of k nearest Study-A neighbours
     # that are metal binders (matches "do microproteins sit among metal binders?")
