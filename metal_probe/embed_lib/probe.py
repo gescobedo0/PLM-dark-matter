@@ -111,6 +111,31 @@ def mlp_cluster_cv(X, y, groups, *, n_splits=5, hidden=128, dropout=0.2,
             "n_folds": k, "n_groups": int(len(np.unique(groups)))}
 
 
+def fit_mlp(X, y, *, epochs=50, hidden=128, dropout=0.2, lr=1e-3, seed=0):
+    """Train the small MLP once (on already-scaled X) -> predict(Xnew)->proba."""
+    import torch
+    import torch.nn as nn
+    torch.manual_seed(seed)
+    Xt = torch.tensor(np.asarray(X, np.float32)); yt = torch.tensor(np.asarray(y, np.float32))
+    pw = torch.tensor([(np.asarray(y) == 0).sum() / max(1, (np.asarray(y) == 1).sum())],
+                      dtype=torch.float32)
+    net = nn.Sequential(nn.LayerNorm(X.shape[1]), nn.Linear(X.shape[1], hidden),
+                        nn.LeakyReLU(), nn.Dropout(dropout),
+                        nn.LayerNorm(hidden), nn.Linear(hidden, 1))
+    opt = torch.optim.Adam(net.parameters(), lr=lr)
+    lossf = nn.BCEWithLogitsLoss(pos_weight=pw)
+    net.train()
+    for _ in range(epochs):
+        opt.zero_grad(); lossf(net(Xt).squeeze(1), yt).backward(); opt.step()
+    net.eval()
+
+    def predict(Xn):
+        import torch
+        with torch.no_grad():
+            return torch.sigmoid(net(torch.tensor(np.asarray(Xn, np.float32))).squeeze(1)).numpy()
+    return predict
+
+
 def assert_no_group_leakage(groups, X, y, n_splits=5):
     """Verify GroupKFold never puts a group in both train and test."""
     groups = np.asarray(groups)

@@ -52,6 +52,19 @@ in the microproteins, and tests them per-residue and per-protein against the
 → `results/microprotein_scan/` — `scan_stats.md`, ranked `candidates.csv` (with
 highlighted ORFs + percentile vs control), and figures.
 
+Site-atlas (which-metal characterization; needs residue embeddings):
+```bash
+python 14_site_atlas.py --model 650M --kmain 3
+```
+Represents each protein by the mean of its top-k coordinating-scored residues
+(length-independent, site-focused). Runs a **pass-gate panel on knowns first**
+(ion-type separation + anti-circularity random-CHED control + alignment-free
+same-ion/different-cluster convergence), then projects microproteins and assigns
+each a nearest ion centroid. → `results/site_atlas/` — `panel_stats.md`,
+`microprotein_ion.csv` (ranked, nearest ion per ORF), and the atlas PCA.
+Read Panel A + C first; the microprotein `nearest_ion` only means something if
+ions separate and non-alignable same-ion proteins co-locate on the knowns.
+
 ## Locked decisions (user sign-off 2026-08-15)
 
 - Positive ions: **Zn / Cu / Fe / Mn / Co / Ni** (Ni only where BioLiP-confirmed).
