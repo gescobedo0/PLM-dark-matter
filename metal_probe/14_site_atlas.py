@@ -195,10 +195,34 @@ def main():
         ["protein_id", "highlight", "n_candidate", "nearest_ion", "nearest_cos_dist"]
     ].to_csv(out / "microprotein_ion.csv", index=False)
 
+    # --- domain-shift diagnostic: where do the human controls land? ---
+    Sn_all = normalize(site_std)
+    pdb_mask = (info["study"] == "A").to_numpy()
+    pdb_cen = normalize(Sn_all[pdb_mask].mean(0)[None])[0]
+    micro_cen = normalize(Sn_all[(info["class"] == "microprotein").to_numpy()].mean(0)[None])[0]
+    ds_groups = {
+        "PDB metal": (info["study"] == "A").to_numpy() & info["class"].isin(["Zn", "Cu", "other_transition"]).to_numpy(),
+        "PDB non-metal": (info["study"] == "A").to_numpy() & (info["class"] == "non_metal").to_numpy(),
+        "microprotein": (info["class"] == "microprotein").to_numpy(),
+        "size_matched_short": (info["class"] == "size_matched_short").to_numpy(),
+        "general_background": (info["class"] == "general_background").to_numpy()}
+    ds_rows = []
+    for name, m in ds_groups.items():
+        if not m.any():
+            continue
+        d_pdb = 1 - Sn_all[m] @ pdb_cen
+        d_mic = 1 - Sn_all[m] @ micro_cen
+        ds_rows.append({"group": name, "n": int(m.sum()),
+                        "med_dist_to_PDB": round(float(np.median(d_pdb)), 3),
+                        "med_dist_to_micro": round(float(np.median(d_mic)), 3),
+                        "frac_closer_to_micro": round(float((d_mic < d_pdb).mean()), 3)})
+    ds = pd.DataFrame(ds_rows)
+
+    # shared PCA coords for both atlas + domain-shift figures
+    xy = PCA(2, random_state=0).fit_transform(StandardScaler().fit_transform(site))
+
     # --- figures ---
     # atlas PCA (all points), knowns by ion, microproteins overlaid
-    pca = PCA(2, random_state=0).fit(StandardScaler().fit_transform(site))
-    xy = pca.transform(StandardScaler().fit_transform(site))
     fig, ax = plt.subplots(figsize=(7, 6))
     nm = info["class"] == "non_metal"
     ax.scatter(xy[nm, 0], xy[nm, 1], s=8, c="#dddddd", alpha=0.5, label="non-metal", linewidths=0)
@@ -214,6 +238,17 @@ def main():
     ax.set_title(f"Site-atlas (top-{args.kmain} mean-pool, {args.model} L{layer})")
     ax.set_xticks([]); ax.set_yticks([]); ax.legend(fontsize=7, markerscale=1.5)
     fig.tight_layout(); fig.savefig(out / "site_atlas_pca.png", dpi=150); plt.close(fig)
+
+    # domain-shift diagnostic: all five populations, distinctly coloured
+    fig, ax = plt.subplots(figsize=(7, 6))
+    gcol = {"PDB metal": "#1f77b4", "PDB non-metal": "#bbbbbb", "microprotein": "#d62728",
+            "size_matched_short": "#ff7f0e", "general_background": "#2ca02c"}
+    for name, m in ds_groups.items():
+        if m.any():
+            ax.scatter(xy[m, 0], xy[m, 1], s=10, c=gcol[name], alpha=0.5, label=name, linewidths=0)
+    ax.set_title("Domain-shift check: where do the human controls land?")
+    ax.set_xticks([]); ax.set_yticks([]); ax.legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(out / "domain_shift.png", dpi=150); plt.close(fig)
 
     # ablation: ion separation vs k (top-k vs random-CHED)
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -250,6 +285,16 @@ def main():
            f"(closer = more site-like): micro median {micro['nearest_cos_dist'].median():.3f}, "
            f"control median {ctrl['nearest_cos_dist'].median():.3f}, MWU p(micro<control)={p:.2e}.",
            f"Nearest-ion assignments in microprotein_ion.csv ({len(micro)} microproteins)."]
+    md += ["", "## Domain-shift diagnostic",
+           "Median cosine distance of each population to the PDB (Study A) centroid vs the "
+           "microprotein centroid. If `size_matched_short` (human, short, canonical) sits "
+           "with the microproteins, the island is a short/human shift; if it sits with PDB, "
+           "the shift is microprotein-specific (Ribo-seq novelty/disorder).", "",
+           "| group | n | dist→PDB | dist→micro | frac closer to micro |",
+           "|---|--:|--:|--:|--:|"]
+    for _, r in ds.iterrows():
+        md.append(f"| {r['group']} | {r['n']} | {r['med_dist_to_PDB']} | "
+                  f"{r['med_dist_to_micro']} | {r['frac_closer_to_micro']} |")
     hlrep = micro[micro["highlight"] == True].sort_values("nearest_cos_dist")
     if len(hlrep):
         md += ["", f"MetalNet2-highlighted ORFs ({len(hlrep)}):"]
