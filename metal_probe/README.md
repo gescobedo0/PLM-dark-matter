@@ -40,6 +40,17 @@ python 11_residue_probe.py --emergence
 `results/residue/residue_probe.md` — the make-or-break row is **`aa_matched` embedding
 vs identity-baseline**: does the embedding distinguish a coordinating His/Cys from a
 non-coordinating one (real site signal), or only detect "it's a His" (identity)?
+**Result (650M L33): yes** — embed-mlp 0.933 / embed-logistic 0.897 vs identity 0.766.
+
+Then the discovery step (needs the residue embeddings from above):
+```bash
+python 12_microprotein_residue_scan.py --model 650M     # scan microproteins
+```
+Trains the H/C/D/E coordinating scorer on Study A, scores every candidate residue
+in the microproteins, and tests them per-residue and per-protein against the
+**length-matched** `size_matched_short` control (never per-protein hit counts).
+→ `results/microprotein_scan/` — `scan_stats.md`, ranked `candidates.csv` (with
+highlighted ORFs + percentile vs control), and figures.
 
 ## Locked decisions (user sign-off 2026-08-15)
 
