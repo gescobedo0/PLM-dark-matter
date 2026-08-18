@@ -65,6 +65,19 @@ each a nearest ion centroid. → `results/site_atlas/` — `panel_stats.md`,
 Read Panel A + C first; the microprotein `nearest_ion` only means something if
 ions separate and non-alignable same-ion proteins co-locate on the knowns.
 
+Multi-label per-ion residue model (which-metal, supervised; needs residue embeddings):
+```bash
+python 15_ion_residue_model.py --model 650M
+```
+Independent sigmoid head per ion (a residue can be Cu-ish AND Fe-ish), masked BCE
+(other-metal ligands masked per head), GroupKFold on cluster. Background-calibrated
+(z above non-coordinating) so data-starved heads can't dominate. → `results/ion_residue/`:
+`ion_model_report.md` (per-ion **`discriminate_auroc`** = the honest which-metal number;
+`detect_auroc` is just coordination detection), `metal_similarity.png` (chemical
+similarity from cross-scores), `protein_coherence.csv` (do a protein's top residues
+agree on an ion = a site), `microprotein_profile.csv` (ranked strength×coherence,
+dominant ion, MetalNet2 flagged), `residue_scores.parquet`, `hidden_atlas.png`.
+
 ## Locked decisions (user sign-off 2026-08-15)
 
 - Positive ions: **Zn / Cu / Fe / Mn / Co / Ni** (Ni only where BioLiP-confirmed).
